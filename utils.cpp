@@ -1,5 +1,71 @@
 #include "utils.h"
 
+int* signal_::pipefd = 0;
+
+signal_::signal_(int *pipe)
+{
+    signal_::pipefd = pipe;
+    setnonblocking(pipefd[1]); //设置管道写端为非阻塞
+    addsig(SIGPIPE, SIG_IGN);
+    addsig(SIGALRM, sig_handler, false);
+    addsig(SIGTERM, sig_handler, false);
+    alarm(TIMESLOT);
+}
+signal_::~signal_()
+{
+	close(pipefd[1]);
+    close(pipefd[0]);
+}
+
+void signal_::addsig(int sig, void(handler)(int), bool restart)
+{
+    struct sigaction sa;
+    memset(&sa, '\0', sizeof(sa));
+    sa.sa_handler = handler;
+    if (restart)
+        sa.sa_flags |= SA_RESTART;
+    sigfillset(&sa.sa_mask);
+    assert(sigaction(sig, &sa, NULL) != -1);
+}
+
+void signal_::sig_handler(int sig)
+{
+    //为保证函数的可重入性，保留原来的errno
+    int save_errno = errno;
+    int msg = sig;
+    send(pipefd[1], (char *)&msg, 1, 0);
+    errno = save_errno;
+}
+
+bool signal_::dealsignal(int fd, bool &timeout, bool &stop_server)
+{
+    int ret = 0;
+    int sig;
+    char signals[1024];
+    ret = recv(fd, signals, sizeof(signals), 0);
+    if (ret <= 0)
+    {
+        return false;
+    }
+    else
+    {
+        for (int i = 0; i < ret; ++i)
+        {
+            switch (signals[i])
+            {
+                case SIGALRM: {
+                    timeout = true; break;
+                }
+                case SIGTERM: {
+                    stop_server = true; break;
+                }
+            }
+        }
+    }
+    return true;
+}
+
+/******************************************************/
 
 void addfd(int epollfd, int fd, bool oneshot)
 {
