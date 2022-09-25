@@ -21,7 +21,7 @@ int main(int argc, char *argv[])
 	std::vector<timer> timers = std::vector<timer>(MAX_FD);
 
 	listenfd=socket(PF_INET, SOCK_STREAM, 0);
-	memset(&serv_adr, 0, sizeof(serv_adr));
+	bzero(&serv_adr, sizeof(serv_adr));
 	serv_adr.sin_family=AF_INET;
 	serv_adr.sin_addr.s_addr=htonl(INADDR_ANY);
 	serv_adr.sin_port = htons(atoi(argv[1]));
@@ -52,7 +52,7 @@ int main(int argc, char *argv[])
 				users[connfd].init(connfd,epollfd);
 				timers[connfd].init(connfd,epollfd);
 				addfd(epollfd,connfd,true);
-				timer_queue->add((timer*)&timers[connfd]);
+				timer_queue->add(&timers[connfd]);
 			}
             else if (events[i].events & (EPOLLRDHUP | EPOLLHUP | EPOLLERR))
             {
@@ -67,18 +67,20 @@ int main(int argc, char *argv[])
             else if (events[i].events & EPOLLIN)
             {
             	// printf("connfd read!\n");
+				timer_queue->update(&timers[sockfd]);
 				pool->append(&users[sockfd], false);
             }
             else if (events[i].events & EPOLLOUT)
             {
 				// printf("connfd write!\n");
+				timer_queue->update(&timers[sockfd]);
 				pool->append(&users[sockfd], true);
             }
 			
 		}
 		if(timeout)
 		{
-			printf("tick~\n"); 
+			// printf("tick~\n"); 
 			timer_queue->tick();
 			alarm(TIMESLOT);
 			timeout = false;

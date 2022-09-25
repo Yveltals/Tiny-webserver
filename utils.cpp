@@ -40,7 +40,6 @@ void signal_::sig_handler(int sig)
 bool signal_::dealsignal(int fd, bool &timeout, bool &stop_server)
 {
     int ret = 0;
-    int sig;
     char signals[1024];
     ret = recv(fd, signals, sizeof(signals), 0);
     if (ret <= 0)

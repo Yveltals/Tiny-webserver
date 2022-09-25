@@ -57,7 +57,7 @@ bool threadpool::append(http_conn* request, bool rw)
 
 void *threadpool::worker(void *arg)
 {
-    threadpool *pool = (threadpool *)arg;
+    threadpool *pool = (threadpool*)arg;
     pool->run();
     return pool;
 }
@@ -67,32 +67,40 @@ void threadpool::run()
     {
         queuetask.wait();
         queuelock.lock();
-        if (workqueue.empty()) {
-            queuelock.unlock();
-            continue;
+        if (workqueue.empty()) 
+        {
+            queuelock.unlock(); continue;
         }
         http_conn *request = workqueue.front();
         workqueue.pop_front();
         queuelock.unlock();
-        if (!request)
-            continue;
-        if (request->rw == 0) { // read
-            if (!request->read()) {
+
+        if (!request) continue;
+        if (request->rw == 0) 
+        { // read
+            if (!request->read()) 
+            {
                 printf("read error!\n");
+                epoll_ctl(request->epollfd, EPOLL_CTL_DEL, request->sockfd, 0);
+                close(request->sockfd);
             }
             else {
                 // printf("%s\n",request->read_buf);
-                request->process();
-                // printf("process finished!\n");
+                if(!request->process()){
+                    epoll_ctl(request->epollfd, EPOLL_CTL_DEL, request->sockfd, 0);
+                    close(request->sockfd);
+                }
             }
         }
-        else {  // write
-            if (!request->write()){ //短连接或出错
+        else 
+        {  // write
+            if (!request->write())
+            { //短连接或出错
                 printf("close sockfd!\n");
                 epoll_ctl(request->epollfd, EPOLL_CTL_DEL, request->sockfd, 0);
                 close(request->sockfd);
-            }else{ //保持长连接
-                // printf("keep alive\n");
+            }else{ 
+                //保持长连接
             }
         }
     }

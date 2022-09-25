@@ -94,22 +94,96 @@ bool http_conn::write(){
     return true;
 }
 
-bool http_conn::process(){
-    char *p,*space=(char*)" ";
+bool http_conn::dealfile(){
+    char *p, *space=(char*)" ";
     p = strtok(read_buf,space);
     strcpy(methed,p);
     p = strtok(NULL,space);
-    p++;
-    strcpy(file_path,(char*)"static/");
-    strcat(file_path,p); printf("file_path: %s\n",file_path);
+    strcpy(file_path,(char*)"static");
+    strcat(file_path,p); 
+    printf("file_path: %s\n",file_path);
+    if(strlen(file_path)==7)
+    {
+        strcat(file_path,(char*)"index.html");
+    }
+    return true;
+}
+bool http_conn::dealuser(){
+    int i=0;
+    char *name,*pwd;
+    for(;i<read_idx-3;++i){
+        if(read_buf[i]=='\r' && read_buf[i+1]=='\n' && 
+            read_buf[i+2]=='\r' && read_buf[i+3]=='\n')
+        {
+            i+=4; break;
+        }
+    }
+    if(i>=read_idx-3){
+        fprintf(stderr, "POST request anaylise failed\n");
+        return false;
+    }
+    // printf("%s\n",&read_buf[i]);
+    name = &read_buf[i+5];
+    while(i<read_idx) {
+        if(read_buf[i++]=='&') {
+            read_buf[i-1]=0; break;
+        }
+    }
+    pwd = &read_buf[i+9];
+    strcpy(user_name, name);
+    strcpy(user_pwd, pwd);
+    printf(">>> %s %s\n",user_name,user_pwd);
+    //check
+    if(!strcmp(file_path,(char*)"static/REG"))
+    {
+        //not same
+        int flag = true;
+        if(!strcmp(user_name,(char*)"admin")){
+            fputs("user name existed", stderr);
+            flag = false;
+        }
+        //save
+        if(flag)
+            strcpy(file_path,(char*)"static/log.html");
+        else
+            strcpy(file_path,(char*)"static/registerError.html");
+    }
+    else if(!strcmp(file_path,(char*)"static/LOG"))
+    {
+        //valid
+        int flag = false;
+        if(!strcmp(user_name,(char*)"root") && !strcmp(user_pwd,(char*)"root")){
+            flag = true;
+        }
+        if(flag)
+            strcpy(file_path,(char*)"static/index.html");
+        else 
+            strcpy(file_path,(char*)"static/logError.html");
+    }
+    else
+    {
+        printf("POST is not login or register\n");
+        return false;
+    }
+    return true;
+}
+
+bool http_conn::process()
+{
+    dealfile();
     
+    if(!strcmp(methed,(char*)"POST"))
+    {
+        if(!dealuser()) return false;
+    }
     /****** file ********/
-    if (stat(file_path, &file_stat) < 0){
+    if (stat(file_path, &file_stat) < 0)
+    {
         fprintf(stderr, "file errno is: %d\n", errno);
         return false;
     }
     int fd = open(file_path, O_RDONLY);
-    file_adr = (char *)mmap(0, file_stat.st_size, PROT_READ, MAP_PRIVATE, fd, 0);
+    file_adr = (char*)mmap(0, file_stat.st_size, PROT_READ, MAP_PRIVATE, fd, 0);
     close(fd);
 
     /****** response ******/
