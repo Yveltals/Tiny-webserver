@@ -1,5 +1,9 @@
-#include "http_conn.h"
-#include "locker.h"
+#ifndef THREADPOOL
+#define THREADPOOL
+#include "../http/http_conn.h"
+#include "../locker.h"
+
+using namespace std;
 
 class threadpool{
 public:
@@ -8,37 +12,37 @@ public:
     bool append(http_conn* request, bool rw);
 
 private:
-    static void *worker(void *arg);
-    void run();
-
-private:
     enum {
         thread_num = 50,  //线程池中的线程数
         max_requests = 50 //请求队列中允许的最大请求数
     }; 
-    std::vector<pthread_t> threads;
-    std::list<http_conn*> workqueue; //请求队列
+    vector<pthread_t> threads;
+    list<http_conn*> workqueue; //请求队列
     locker queuelock;  //保护请求队列的互斥锁
     sem queuetask;       //是否有任务需要处理
+
+    void run();
+    static void *worker(void *arg);
 };
+
 threadpool::threadpool()
 {
     threads.assign(thread_num,0);
     for(auto p:threads)
     {
         if (pthread_create(&p, NULL, worker, this) != 0) {
-            std::vector<pthread_t>().swap(threads);
-            throw std::exception();
+            vector<pthread_t>().swap(threads);
+            throw exception();
         }
         if (pthread_detach(p)) {
-            std::vector<pthread_t>().swap(threads);
-            throw std::exception();
+            vector<pthread_t>().swap(threads);
+            throw exception();
         }
     }
 }
 threadpool::~threadpool()
 {
-    std::vector<pthread_t>().swap(threads);
+    vector<pthread_t>().swap(threads);
 }
 bool threadpool::append(http_conn* request, bool rw)
 {
@@ -95,7 +99,7 @@ void threadpool::run()
         else 
         {  // write
             if (!request->write())
-            { //短连接或出错
+            {   //短连接或出错
                 printf("close sockfd!\n");
                 epoll_ctl(request->epollfd, EPOLL_CTL_DEL, request->sockfd, 0);
                 close(request->sockfd);
@@ -105,3 +109,5 @@ void threadpool::run()
         }
     }
 }
+
+#endif

@@ -1,6 +1,8 @@
-#include "utils.h"
-#include "threadpool.h"
-#include "timer.h"
+#include "./utils/utils.h"
+#include "./pool/threadpool.h"
+#include "./timer.h"
+#include "./pool/sqlconnpool.h"
+#include "./pool/sqlconnRAII.h"
 
 int main(int argc, char *argv[])
 {
@@ -19,6 +21,10 @@ int main(int argc, char *argv[])
 	connection* timer_queue = new connection();
 	std::vector<http_conn> users = std::vector<http_conn>(MAX_FD);
 	std::vector<timer> timers = std::vector<timer>(MAX_FD);
+
+	SqlConnPool::Instance()->Init();
+	// sqlpool* sql_pool = sqlpool::GetInstance();
+    // &users[0]->initmysql_result(sql_pool);
 
 	listenfd=socket(PF_INET, SOCK_STREAM, 0);
 	bzero(&serv_adr, sizeof(serv_adr));
@@ -49,8 +55,8 @@ int main(int argc, char *argv[])
 				int connfd = Accept(listenfd,(struct sockaddr*)&clnt_adr,&clnt_len);
 				//Todo: connect counts < n
 				printf("Connection Request[%d] : %s:%d\n",connfd,inet_ntoa(clnt_adr.sin_addr), ntohs(clnt_adr.sin_port));
-				users[connfd].init(connfd,epollfd);
-				timers[connfd].init(connfd,epollfd);
+				users[connfd].init(connfd, epollfd);
+				timers[connfd].init(connfd, epollfd);
 				addfd(epollfd,connfd,true);
 				timer_queue->add(&timers[connfd]);
 			}

@@ -1,8 +1,14 @@
+#ifndef HTTP_CONN
+#define HTTP_CONN
 #include <bits/stdc++.h>
 #include <sys/socket.h>
 #include <sys/stat.h> 
 #include <sys/mman.h>
 #include <sys/uio.h>
+#include "../pool/sqlconnpool.h"
+#include "../pool/sqlconnRAII.h"
+#include "../utils/utils.h"
+
 
 class http_conn{
 public:
@@ -20,6 +26,7 @@ public:
     bool dealfile();
     bool dealuser();
     void unmap();
+    
     int epollfd;
     int sockfd;
     bool rw;     // 0读 1写
@@ -40,5 +47,6 @@ public:
 
     char user_name[50];
     char user_pwd[50];
-
 };
+
+#endif

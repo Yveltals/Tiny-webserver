@@ -1,5 +1,4 @@
-#include "http_conn.h"
-#include "utils.h"
+#include "../http/http_conn.h"
 
 void http_conn::init(int sockfd, int epollfd)
 {
@@ -85,7 +84,7 @@ bool http_conn::write(){
         {
             unmap();
             modfd(epollfd, sockfd, EPOLLIN);
-            printf("writev finish\n");
+            // printf("writev finish\n");
             init();
             return true; // TODO浏览器的请求为长连接
         }
@@ -132,33 +131,47 @@ bool http_conn::dealuser(){
     pwd = &read_buf[i+9];
     strcpy(user_name, name);
     strcpy(user_pwd, pwd);
-    printf(">>> %s %s\n",user_name,user_pwd);
+    // printf(">>> %s %s\n",user_name,user_pwd);
     //check
+    MYSQL* sql;
+    SqlConnRAII(&sql, SqlConnPool::Instance());
+    char order[256] = { 0 };
+    MYSQL_RES *res = nullptr;
+    snprintf(order, 256, "SELECT username, password FROM user WHERE username='%s'", user_name);
+    printf("%s\n", order);
+
+    if(mysql_query(sql, order)) { 
+        mysql_free_result(res); 
+        puts("query failed");
+        return false; 
+    }
+    res = mysql_store_result(sql);
+    MYSQL_ROW row = mysql_fetch_row(res);
+
     if(!strcmp(file_path,(char*)"static/REG"))
     {
-        //not same
-        int flag = true;
-        if(!strcmp(user_name,(char*)"admin")){
-            fputs("user name existed", stderr);
-            flag = false;
-        }
-        //save
-        if(flag)
+        if(!row && strlen(user_pwd)>0)
+        {
+            bzero(order, 256);
+            snprintf(order,256,"INSERT INTO user(username, password) VALUES('%s','%s')",user_name,user_pwd);
+            printf("%s\n", order);
+            if(mysql_query(sql, order)) { 
+                puts( "Insert error!");
+            }
             strcpy(file_path,(char*)"static/log.html");
-        else
+        }
+        else{
             strcpy(file_path,(char*)"static/registerError.html");
+        }
+        mysql_free_result(res);
     }
     else if(!strcmp(file_path,(char*)"static/LOG"))
     {
-        //valid
-        int flag = false;
-        if(!strcmp(user_name,(char*)"root") && !strcmp(user_pwd,(char*)"root")){
-            flag = true;
-        }
-        if(flag)
+        if(row && !strcmp(row[1],user_pwd))
             strcpy(file_path,(char*)"static/index.html");
         else 
             strcpy(file_path,(char*)"static/logError.html");
+        mysql_free_result(res);
     }
     else
     {

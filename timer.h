@@ -1,6 +1,6 @@
 #ifndef TIMER_H
 #define TIMER_H
-#include "utils.h"
+#include "./utils/utils.h"
 
 class timer
 {
@@ -55,10 +55,10 @@ void connection::update(timer* t)
         }
     }
     add(t);
-    printf("update ~~\n");
+    // printf("update ~~\n");
 }
 // 移除客户端监听，关闭套接字
-void cb_func_(timer* t)
+void remove(timer* t)
 {
     epoll_ctl(t->epollfd, EPOLL_CTL_DEL, t->sockfd, 0);
     close(t->sockfd);
@@ -69,8 +69,8 @@ void timer::init(int sockfd,int epollfd)
 {
     this->sockfd = sockfd;
     this->epollfd = epollfd;
-    this->expire = time(NULL) + 2*TIMESLOT;
-    this->cb_func = cb_func_;
+    this->expire = time(NULL) + 3*TIMESLOT;
+    this->cb_func = remove;
 }
 
 #endif

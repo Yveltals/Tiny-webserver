@@ -5,8 +5,8 @@ else
     CXXFLAGS += -O2
 endif
 
-server: webserver.cpp utils.cpp http_conn.cpp
-	g++ -o server $^ -lpthread
+server: webserver.cpp ./utils/utils.cpp ./http/http_conn.cpp ./pool/sqlconnpool.cpp
+	g++ -o server $^ -lpthread -lmysqlclient
 
 clean:
 	rm  -r server
