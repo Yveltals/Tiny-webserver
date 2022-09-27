@@ -62,8 +62,8 @@ void remove(timer* t)
 {
     epoll_ctl(t->epollfd, EPOLL_CTL_DEL, t->sockfd, 0);
     close(t->sockfd);
-    printf("<Timeout sockfd: %d>\n",t->sockfd);
-    // http_conn::m_user_count--;
+    // printf("<Timeout sockfd: %d>\n",t->sockfd);
+    //TODO http_conn::m_user_count--;
 }
 void timer::init(int sockfd,int epollfd)
 {

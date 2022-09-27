@@ -80,7 +80,7 @@ void removefd(int epollfd, int fd)
 {
     epoll_ctl(epollfd, EPOLL_CTL_DEL, fd, 0);
     close(fd);
-    printf("Disconnection\n");
+    // printf("Disconnection\n");
 }
 
 void modfd(int epollfd, int fd, int ev)

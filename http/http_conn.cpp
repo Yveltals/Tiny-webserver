@@ -44,7 +44,7 @@ bool http_conn::write(){
     int temp = 0, newadd = 0;
     if (bytes_to_send == 0)
     {
-        printf("bytes to send = 0 -> EPOLLIN\n");
+        fprintf(stderr, "bytes to send = 0 -> EPOLLIN\n");
         modfd(epollfd, sockfd, EPOLLIN);
         init();
         return true;
@@ -138,7 +138,7 @@ bool http_conn::dealuser(){
     char order[256] = { 0 };
     MYSQL_RES *res = nullptr;
     snprintf(order, 256, "SELECT username, password FROM user WHERE username='%s'", user_name);
-    printf("%s\n", order);
+    // printf("%s\n", order);
 
     if(mysql_query(sql, order)) { 
         mysql_free_result(res); 
@@ -175,7 +175,7 @@ bool http_conn::dealuser(){
     }
     else
     {
-        printf("POST is not login or register\n");
+        fprintf(stderr, "POST is not login or register\n");
         return false;
     }
     return true;

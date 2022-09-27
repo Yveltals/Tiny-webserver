@@ -13,8 +13,8 @@ public:
 
 private:
     enum {
-        thread_num = 50,  //线程池中的线程数
-        max_requests = 50 //请求队列中允许的最大请求数
+        thread_num = 8,  //线程池中的线程数
+        max_requests = 10000 //请求队列中允许的最大请求数
     }; 
     vector<pthread_t> threads;
     list<http_conn*> workqueue; //请求队列
@@ -84,7 +84,7 @@ void threadpool::run()
         { // read
             if (!request->read()) 
             {
-                printf("read error!\n");
+                fprintf(stderr, "read error!\n");
                 epoll_ctl(request->epollfd, EPOLL_CTL_DEL, request->sockfd, 0);
                 close(request->sockfd);
             }
@@ -100,11 +100,14 @@ void threadpool::run()
         {  // write
             if (!request->write())
             {   //短连接或出错
-                printf("close sockfd!\n");
+                fprintf(stderr, "close sockfd!\n");
                 epoll_ctl(request->epollfd, EPOLL_CTL_DEL, request->sockfd, 0);
                 close(request->sockfd);
             }else{ 
                 //保持长连接
+                //用于短连接webbench测试
+                epoll_ctl(request->epollfd, EPOLL_CTL_DEL, request->sockfd, 0);
+                close(request->sockfd);
             }
         }
     }

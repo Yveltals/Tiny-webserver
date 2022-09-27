@@ -30,14 +30,15 @@ int main(int argc, char *argv[])
 	bzero(&serv_adr, sizeof(serv_adr));
 	serv_adr.sin_family=AF_INET;
 	serv_adr.sin_addr.s_addr=htonl(INADDR_ANY);
-	serv_adr.sin_port = htons(atoi(argv[1]));
+	serv_adr.sin_port = htons(9000);
+	if(argc > 1) serv_adr.sin_port = htons(atoi(argv[1]));
 	setsockopt(listenfd, SOL_SOCKET, SO_REUSEADDR, &flag, sizeof(flag));
 	Bind(listenfd, (struct sockaddr*)&serv_adr, sizeof(serv_adr));
 	Listen(listenfd, 20);
 
 	epoll_event events[MAX_EVENT_NUM];
     epollfd = epoll_create(5);
-	addfd(epollfd,listenfd);
+	addfd(epollfd,listenfd); 
     addfd(epollfd, signal_::pipefd[0]); //设置管道读端为ET非阻塞
 
 	bool timeout = false;
@@ -48,13 +49,13 @@ int main(int argc, char *argv[])
 		int number = Epoll_wait(epollfd, events, MAX_EVENT_NUM, -1);
 		for(int i=0;i<number;++i){
 			int sockfd = events[i].data.fd;
-			// printf(">>> sockfd = %d\n",sockfd);
+			// printf(">>> sockfd = %d\n",sockfd); 
 			if (sockfd == listenfd)
             {
 			    socklen_t clnt_len = sizeof(clnt_adr);
 				int connfd = Accept(listenfd,(struct sockaddr*)&clnt_adr,&clnt_len);
 				//Todo: connect counts < n
-				printf("Connection Request[%d] : %s:%d\n",connfd,inet_ntoa(clnt_adr.sin_addr), ntohs(clnt_adr.sin_port));
+				// printf("Connection Request[%d] : %s:%d\n",connfd,inet_ntoa(clnt_adr.sin_addr), ntohs(clnt_adr.sin_port));
 				users[connfd].init(connfd, epollfd);
 				timers[connfd].init(connfd, epollfd);
 				addfd(epollfd,connfd,true);
@@ -72,7 +73,7 @@ int main(int argc, char *argv[])
             }
             else if (events[i].events & EPOLLIN)
             {
-            	// printf("connfd read!\n");
+            	// printf("connfd read!\n"); 
 				timer_queue->update(&timers[sockfd]);
 				pool->append(&users[sockfd], false);
             }
@@ -86,7 +87,6 @@ int main(int argc, char *argv[])
 		}
 		if(timeout)
 		{
-			// printf("tick~\n"); 
 			timer_queue->tick();
 			alarm(TIMESLOT);
 			timeout = false;
