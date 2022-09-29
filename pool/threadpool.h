@@ -1,116 +1,65 @@
-#ifndef THREADPOOL
-#define THREADPOOL
-#include "../http/http_conn.h"
-#include "../locker.h"
+#ifndef TINY_WEBSERVER_THREADPOOL__H
+#define TINY_WEBSERVER_THREADPOOL__H
 
-using namespace std;
-
-class threadpool{
+#include <mutex>
+#include <condition_variable>
+#include <queue>
+#include <thread>
+#include <functional>
+class ThreadPool {
 public:
-    threadpool();
-    ~threadpool();
-    bool append(http_conn* request, bool rw);
+    explicit ThreadPool(size_t threadCount = 8): pool_(std::make_shared<Pool>()) {
+        assert(threadCount > 0);
+        for(size_t i = 0; i < threadCount; i++) {
+            std::thread([pool = pool_] {
+                std::unique_lock<std::mutex> locker(pool->mtx);
+                while(true) {
+                    if(!pool->tasks.empty()) {
+                        auto task = std::move(pool->tasks.front());
+                        pool->tasks.pop();
+                        locker.unlock();
+                        task();
+                        locker.lock();
+                    }
+                    else if(pool->isClosed) break;
+                    else pool->cond.wait(locker);
+                }
+            }).detach();
+        }
+    }
+
+    ThreadPool() = default;
+
+    ThreadPool(ThreadPool&&) = default;
+
+    ~ThreadPool() {
+        if(static_cast<bool>(pool_)) {
+            {
+                std::lock_guard<std::mutex> locker(pool_->mtx);
+                pool_->isClosed = true;
+            }
+            pool_->cond.notify_all();
+        }
+    }
+
+    template<class F>
+    void AddTask(F&& task) {
+        {
+            std::lock_guard<std::mutex> locker(pool_->mtx);
+            pool_->tasks.emplace(std::forward<F>(task));
+        }
+        pool_->cond.notify_one();
+    }
 
 private:
-    enum {
-        thread_num = 8,  //线程池中的线程数
-        max_requests = 10000 //请求队列中允许的最大请求数
-    }; 
-    vector<pthread_t> threads;
-    list<http_conn*> workqueue; //请求队列
-    locker queuelock;  //保护请求队列的互斥锁
-    sem queuetask;       //是否有任务需要处理
-
-    void run();
-    static void *worker(void *arg);
+    struct Pool {
+        std::mutex mtx;
+        std::condition_variable cond;
+        bool isClosed;
+        std::queue<std::function<void()>> tasks;
+    };
+    std::shared_ptr<Pool> pool_;
 };
 
-threadpool::threadpool()
-{
-    threads.assign(thread_num,0);
-    for(auto p:threads)
-    {
-        if (pthread_create(&p, NULL, worker, this) != 0) {
-            vector<pthread_t>().swap(threads);
-            throw exception();
-        }
-        if (pthread_detach(p)) {
-            vector<pthread_t>().swap(threads);
-            throw exception();
-        }
-    }
-}
-threadpool::~threadpool()
-{
-    vector<pthread_t>().swap(threads);
-}
-bool threadpool::append(http_conn* request, bool rw)
-{
-    queuelock.lock();
-    if (workqueue.size() >= max_requests)
-    {
-        queuelock.unlock();
-        return false;
-    }
-    request->rw = rw;
-    workqueue.push_back(request);
-    queuelock.unlock();
-    queuetask.post();
-    return true;
-}
 
-void *threadpool::worker(void *arg)
-{
-    threadpool *pool = (threadpool*)arg;
-    pool->run();
-    return pool;
-}
-void threadpool::run()
-{
-    while (true)
-    {
-        queuetask.wait();
-        queuelock.lock();
-        if (workqueue.empty()) 
-        {
-            queuelock.unlock(); continue;
-        }
-        http_conn *request = workqueue.front();
-        workqueue.pop_front();
-        queuelock.unlock();
-
-        if (!request) continue;
-        if (request->rw == 0) 
-        { // read
-            if (!request->read()) 
-            {
-                fprintf(stderr, "read error!\n");
-                epoll_ctl(request->epollfd, EPOLL_CTL_DEL, request->sockfd, 0);
-                close(request->sockfd);
-            }
-            else {
-                // printf("%s\n",request->read_buf);
-                if(!request->process()){
-                    epoll_ctl(request->epollfd, EPOLL_CTL_DEL, request->sockfd, 0);
-                    close(request->sockfd);
-                }
-            }
-        }
-        else 
-        {  // write
-            if (!request->write())
-            {   //短连接或出错
-                fprintf(stderr, "close sockfd!\n");
-                epoll_ctl(request->epollfd, EPOLL_CTL_DEL, request->sockfd, 0);
-                close(request->sockfd);
-            }else{ 
-                //保持长连接
-                //用于短连接webbench测试
-                epoll_ctl(request->epollfd, EPOLL_CTL_DEL, request->sockfd, 0);
-                close(request->sockfd);
-            }
-        }
-    }
-}
-
-#endif
+#endif //TINY_WEBSERVER_THREADPOOL__H
