@@ -6,6 +6,7 @@
 #include <arpa/inet.h>   // sockaddr_in
 #include <stdlib.h>      // atoi()
 #include <errno.h>
+#include <atomic>
 #include <string.h> 
 #include <sys/epoll.h>
 #include <unistd.h>
@@ -21,8 +22,6 @@ public:
     ~HttpConn();
     void init();
     void init(int epollFd ,int sockFd, const sockaddr_in& addr);
-    // ssize_t read(int* saveErrno);
-    // ssize_t write(int* saveErrno);
     void Close();
     
     bool read();
@@ -31,9 +30,6 @@ public:
     bool dealfile();
     bool dealuser();
     void modfd(int, int, int);
-    int ToWriteBytes() { 
-        return iov_[0].iov_len + iov_[1].iov_len; 
-    }
     void UnmapFile();
     
     int epollFd_;
@@ -47,17 +43,18 @@ public:
     char write_buf[2048];
     int iovCnt_;
     struct iovec iov_[2];
-    int bytes_to_send;
-    int bytes_sended;
+    size_t bytes_to_send;
+    size_t bytes_sended;
 
     char methed[20];
-    // char* file_adr; //内存映射地址
     char file_path[50]; //文件请求路径
     char* mmFile_; 
     struct stat mmFileStat_; //记录文件信息
 
     char user_name[50];
     char user_pwd[50];
+    
+    static std::atomic<int> userCount;
 };
 
 

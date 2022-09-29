@@ -1,5 +1,6 @@
 #include "httpconn.h"
-using namespace std;
+
+std::atomic<int> HttpConn::userCount;
 
 HttpConn::HttpConn() { 
     epollFd_ = -1;
@@ -14,6 +15,7 @@ HttpConn::~HttpConn() {
 
 void HttpConn::init(int epollfd, int fd, const sockaddr_in& addr) {
     assert(fd > 0);
+    userCount++;
     addr_ = addr;
     epollFd_ = epollfd;
     fd_ = fd;
@@ -35,7 +37,8 @@ void HttpConn::Close() {
     if(isClose_ == false){
         isClose_ = true;
         close(fd_);
-        printf("Client[%d](%s:%d) quit\n", fd_, inet_ntoa(addr_.sin_addr), addr_.sin_port);
+        userCount--;
+        printf("Client[%d](%s:%d) quit, UserCount:%d\n",fd_,inet_ntoa(addr_.sin_addr),addr_.sin_port,(int)userCount);
     }
 }
 
@@ -44,7 +47,7 @@ void HttpConn::UnmapFile() {
         munmap(mmFile_, mmFileStat_.st_size);
         mmFile_ = nullptr;
     }else{
-        // puts("mmFile is nullptr");
+        puts("mmFile is nullptr");
     }
 }
 
@@ -70,6 +73,7 @@ bool HttpConn::read(){
         }
         read_idx += bytes_read;
     }
+    // puts(read_buf);
     return true;
 }
 
@@ -129,7 +133,6 @@ bool HttpConn::write(){
             event.data.fd = fd_;
             event.events = EPOLLIN | EPOLLET | EPOLLONESHOT | EPOLLRDHUP;
             epoll_ctl(epollFd_, EPOLL_CTL_MOD, fd_, &event);
-            // printf("writev finish\n");
             init();
             return true; // TODO浏览器的请求为长连接
         }

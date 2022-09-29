@@ -1,12 +1,11 @@
-DEBUG ?= 1
-ifeq ($(DEBUG), 1)
-    CXXFLAGS += -g
-else
-    CXXFLAGS += -O2
-endif
+CXX = g++
+CFLAGS = -std=c++14 -O2 -Wall -g 
 
-server: main.cpp ./server/webserver.cpp ./server/epoller.cpp ./http/httpconn.cpp ./pool/sqlconnpool.cpp
-	g++ -o webserver $^ -lpthread -lmysqlclient
+TARGET = webserver
+OBJS = ./pool/*.cpp ./timer/*.cpp ./http/*.cpp ./server/*.cpp ./main.cpp
+
+all: $(OBJS)
+	$(CXX) $(CFLAGS) $(OBJS) -o $(TARGET)  -pthread -lmysqlclient
 
 clean:
-	rm  -r webserver
+	rm -rf $(TARGET)

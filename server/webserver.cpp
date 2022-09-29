@@ -1,9 +1,10 @@
 #include "webserver.h"
 using namespace std;
 
-WebServer::WebServer():
-        port_(9000), isClose_(false), threadpool_(new ThreadPool(8)), epoller_(new Epoller())
+WebServer::WebServer(): port_(9000), timeoutMS_(60000), isClose_(false), 
+    timer_(new HeapTimer()), threadpool_(new ThreadPool(8)), epoller_(new Epoller())
 {
+    HttpConn::userCount = 0;
     SqlConnPool::Instance()->Init();
 
     listenEvent_ = EPOLLRDHUP | EPOLLET;
@@ -75,13 +76,12 @@ void WebServer::Start() {
     int timeMS = -1;  /* epoll wait timeout == -1 无事件将阻塞 */
     if(!isClose_) { puts("========== Server start =========="); }
     while(!isClose_) {
-//        if(timeoutMS_ > 0) {
-//            timeMS = timer_->GetNextTick();
-//        }
+        if(timeoutMS_ > 0) {
+            timeMS = timer_->GetNextTick();
+        }
         int eventCnt = epoller_->Wait(timeMS);
-        for(int i = 0; i < eventCnt; i++) {
-            // printf("eventCnt = %d\n",eventCnt);
-            /* 处理事件 */
+        for(int i = 0; i < eventCnt; i++) 
+        {
             int fd = epoller_->GetEventFd(i);
             uint32_t events = epoller_->GetEvents(i);
             if(fd == listenFd_) {
@@ -111,11 +111,15 @@ void WebServer::DealListen_() {
    do {
     int fd = accept(listenFd_, (struct sockaddr *)&addr, &len);
     if(fd <= 0) { return;}
-    //TODO userCount >= MAX_FD
+    else if(HttpConn::userCount >= MAX_FD) {
+        // SendError_(fd, "Server busy!");
+        puts("Clients is full!");
+        return;
+    }
     users_[fd].init(epoller_->epollFd_ ,fd, addr);
-//    if(timeoutMS_ > 0) {
-//        timer_->add(fd, timeoutMS_, std::bind(&WebServer::CloseConn_, this, &users_[fd]));
-//    }
+    if(timeoutMS_ > 0) {
+        timer_->add(fd, timeoutMS_, std::bind(&WebServer::CloseConn_, this, &users_[fd]));
+    }
     epoller_->AddFd(fd, EPOLLIN | connEvent_);
     SetFdNonblock(fd);
     // printf("Client[%d] in!\n", users_[fd].fd_);
@@ -124,7 +128,6 @@ void WebServer::DealListen_() {
 
 void WebServer::CloseConn_(HttpConn* client) {
     assert(client);
-    printf("Client[%d] quit!", client->fd_);
     epoller_->DelFd(client->fd_);
     client->Close();
 }

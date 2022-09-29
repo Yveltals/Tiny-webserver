@@ -3,8 +3,8 @@
 
 
 #include <unordered_map>
-#include <fcntl.h>       // fcntl()
-#include <unistd.h>      // close()
+#include <fcntl.h>
+#include <unistd.h>
 #include <assert.h>
 #include <errno.h>
 #include <sys/socket.h>
@@ -12,11 +12,12 @@
 #include <arpa/inet.h>
 #include <functional>
 
-#include "epoller.h"
+#include "../server/epoller.h"
 #include "../pool/sqlconnpool.h"
 #include "../pool/threadpool.h"
 #include "../pool/sqlconnRAII.h"
 #include "../http/httpconn.h"
+#include "../timer/heaptimer.h"
 
 class WebServer {
 public:
@@ -44,7 +45,7 @@ private:
 
     int port_;
 //    bool openLinger_;
-//    int timeoutMS_;  /* 毫秒MS */
+    int timeoutMS_;  /* 毫秒MS */
     bool isClose_;
     int listenFd_;
     char* srcDir_;
@@ -52,7 +53,7 @@ private:
     uint32_t listenEvent_;
     uint32_t connEvent_;
 
-//    std::unique_ptr<HeapTimer> timer_;
+    std::unique_ptr<HeapTimer> timer_;
     std::unique_ptr<ThreadPool> threadpool_;
     std::unique_ptr<Epoller> epoller_;
     std::unordered_map<int, HttpConn> users_;
